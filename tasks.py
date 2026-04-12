@@ -11,6 +11,27 @@ from pathlib import Path
 from invoke import task
 
 
+def generate_random_content(size_kb):
+    """Generate random-looking content that's less compressible."""
+    import random
+    import string
+    # Mix of code-like patterns, varied text, and random strings
+    content = []
+    for i in range(size_kb):
+        # Random function/class names
+        name = ''.join(random.choices(string.ascii_letters, k=random.randint(5, 15)))
+        # Random code patterns
+        patterns = [
+            f"def {name}(arg{i}):\n    return arg{i} * {random.randint(1, 100)}\n\n",
+            f"class {name}:\n    def __init__(self):\n        self.value = {random.random()}\n\n",
+            f"const {name} = {random.randint(1, 1000)};\n",
+            f"# Comment: {' '.join(random.choices(string.ascii_letters, k=50))}\n",
+            f"import {name}\nfrom {name} import *\n",
+        ]
+        content.append(random.choice(patterns))
+    return ''.join(content)
+
+
 @task
 def setup_mock_repos(c):
     """Create mock repositories (simulates bullzai-app and bullzai-data)."""
@@ -23,29 +44,44 @@ def setup_mock_repos(c):
 
     mock_app.mkdir(parents=True)
 
-    # Create some files
+    # Create realistic file structure with ~5MB of less compressible content
     (mock_app / "backend").mkdir(parents=True)
-    (mock_app / "backend" / "main.py").write_text("# Backend service\nprint('Hello from backend')\n")
+    (mock_app / "backend" / "main.py").write_text("# Backend service\n" + generate_random_content(500))
+    (mock_app / "backend" / "database.py").write_text("# Database models\n" + generate_random_content(800))
+    (mock_app / "backend" / "auth.py").write_text("# Authentication\n" + generate_random_content(600))
+
     (mock_app / "frontend").mkdir(parents=True)
-    (mock_app / "frontend" / "App.js").write_text("// React app\nconsole.log('Hello from frontend');\n")
-    (mock_app / "README.md").write_text("# Mock BullzAI App\n\nSimulated application repo.\n")
+    (mock_app / "frontend" / "App.js").write_text("// React app\n" + generate_random_content(1000))
+    (mock_app / "frontend" / "components.js").write_text("// Components\n" + generate_random_content(900))
+
+    (mock_app / "static").mkdir(parents=True)
+    (mock_app / "static" / "bundle.js").write_text("/* Webpack bundle */\n" + generate_random_content(1500))
+    (mock_app / "static" / "styles.css").write_text("/* CSS */\n" + generate_random_content(700))
+
+    (mock_app / "README.md").write_text("# Mock BullzAI App\n\nSimulated application repo.\n" + generate_random_content(200))
 
     # Initialize git in the directory
     c.run(f"git -C {mock_app} init")
     c.run(f"git -C {mock_app} config user.name 'Test User'")
     c.run(f"git -C {mock_app} config user.email 'test@example.com'")
     c.run(f"git -C {mock_app} add .")
-    c.run(f"git -C {mock_app} commit -m 'Initial commit: backend + frontend'")
+    c.run(f"git -C {mock_app} commit -m 'Initial commit: backend + frontend + static'")
 
-    # Add more commits
-    (mock_app / "backend" / "api.py").write_text("# API routes\n")
+    # Add more commits with larger files
+    (mock_app / "backend" / "api.py").write_text("# API routes\n" + generate_random_content(700))
     c.run(f"git -C {mock_app} add .")
     c.run(f"git -C {mock_app} commit -m 'Add API routes'")
 
     (mock_app / "common").mkdir(parents=True)
-    (mock_app / "common" / "utils.py").write_text("# Shared utilities\n")
+    (mock_app / "common" / "utils.py").write_text("# Shared utilities\n" + generate_random_content(500))
+    (mock_app / "common" / "config.py").write_text("# Configuration\n" + generate_random_content(400))
     c.run(f"git -C {mock_app} add .")
     c.run(f"git -C {mock_app} commit -m 'Add common utilities'")
+
+    (mock_app / "docs").mkdir(parents=True)
+    (mock_app / "docs" / "api.md").write_text("# API Documentation\n" + generate_random_content(800))
+    c.run(f"git -C {mock_app} add .")
+    c.run(f"git -C {mock_app} commit -m 'Add documentation'")
 
     # Mock bullzai-data
     mock_data = Path("mock-repos/mock-data")
@@ -54,24 +90,32 @@ def setup_mock_repos(c):
 
     mock_data.mkdir(parents=True)
 
-    # Create some files
+    # Create larger data pipeline files (~3MB)
     (mock_data / "flows").mkdir(parents=True)
-    (mock_data / "flows" / "bronze_flow.py").write_text("# Bronze layer flow\n")
+    (mock_data / "flows" / "bronze_flow.py").write_text("# Bronze layer flow\n" + generate_random_content(800))
+    (mock_data / "flows" / "transformations.py").write_text("# Data transformations\n" + generate_random_content(1000))
+
     (mock_data / "etl_utils").mkdir(parents=True)
-    (mock_data / "etl_utils" / "minio_client.py").write_text("# MinIO utilities\n")
-    (mock_data / "README.md").write_text("# Mock BullzAI Data\n\nSimulated data pipeline repo.\n")
+    (mock_data / "etl_utils" / "minio_client.py").write_text("# MinIO utilities\n" + generate_random_content(600))
+    (mock_data / "etl_utils" / "duckdb_client.py").write_text("# DuckDB client\n" + generate_random_content(700))
+
+    (mock_data / "schemas").mkdir(parents=True)
+    (mock_data / "schemas" / "tables.sql").write_text("-- Table definitions\n" + generate_random_content(1200))
+
+    (mock_data / "README.md").write_text("# Mock BullzAI Data\n\nSimulated data pipeline repo.\n" + generate_random_content(300))
 
     # Initialize git in the directory
     c.run(f"git -C {mock_data} init")
     c.run(f"git -C {mock_data} config user.name 'Test User'")
     c.run(f"git -C {mock_data} config user.email 'test@example.com'")
     c.run(f"git -C {mock_data} add .")
-    c.run(f"git -C {mock_data} commit -m 'Initial commit: flows + etl_utils'")
+    c.run(f"git -C {mock_data} commit -m 'Initial commit: flows + etl_utils + schemas'")
 
     # Add more commits
-    (mock_data / "flows" / "silver_flow.py").write_text("# Silver layer flow\n")
+    (mock_data / "flows" / "silver_flow.py").write_text("# Silver layer flow\n" + generate_random_content(900))
+    (mock_data / "flows" / "validations.py").write_text("# Data validations\n" + generate_random_content(600))
     c.run(f"git -C {mock_data} add .")
-    c.run(f"git -C {mock_data} commit -m 'Add silver flow'")
+    c.run(f"git -C {mock_data} commit -m 'Add silver flow and validations'")
 
     print("✅ Mock repositories created!")
     print(f"   - {mock_app}")
@@ -239,6 +283,8 @@ USER 1000
 @task
 def add_commits_to_repo(c, repo="app", message="Update"):
     """Add new commits to mock repo (simulates development)."""
+    import random
+
     repo_map = {
         "app": "mock-repos/mock-app",
         "data": "mock-repos/mock-data"
@@ -252,10 +298,26 @@ def add_commits_to_repo(c, repo="app", message="Update"):
 
     print(f"\n📝 Adding commits to {repo_path.name}...")
 
-    # Add a new file
-    feature_count = len(list(repo_path.glob('feature_*')))
-    new_file = repo_path / f"feature_{feature_count}.txt"
-    new_file.write_text(f"# {message}\n")
+    # Modify actual code files instead of creating feature files
+    if repo == "app":
+        # Add console logs or debug statements to existing files
+        files_to_modify = [
+            (repo_path / "backend" / "main.py", f'\n# DEBUG: {message}\nprint("Debug: {message}")\n'),
+            (repo_path / "frontend" / "App.js", f'\n// DEBUG: {message}\nconsole.log("Debug: {message}");\n'),
+            (repo_path / "backend" / "api.py", f'\n# Feature: {message}\n# Added on: {random.randint(1000, 9999)}\n'),
+        ]
+    else:  # data repo
+        files_to_modify = [
+            (repo_path / "flows" / "bronze_flow.py", f'\n# Update: {message}\nlogger.info("{message}")\n'),
+            (repo_path / "flows" / "transformations.py", f'\n# Change: {message}\n# Timestamp: {random.randint(1000, 9999)}\n'),
+        ]
+
+    # Pick a random file to modify
+    file_to_modify, content_to_add = random.choice(files_to_modify)
+
+    if file_to_modify.exists():
+        current_content = file_to_modify.read_text()
+        file_to_modify.write_text(current_content + content_to_add)
 
     c.run(f"git -C {repo_path} add .")
     c.run(f'git -C {repo_path} commit -m "{message}"')

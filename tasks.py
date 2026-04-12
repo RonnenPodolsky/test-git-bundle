@@ -22,32 +22,30 @@ def setup_mock_repos(c):
         shutil.rmtree(mock_app)
 
     mock_app.mkdir(parents=True)
-    os.chdir(mock_app)
-    c.run("git init")
-    c.run("git config user.name 'Test User'")
-    c.run("git config user.email 'test@example.com'")
 
     # Create some files
-    (mock_app / "backend").mkdir()
+    (mock_app / "backend").mkdir(parents=True)
     (mock_app / "backend" / "main.py").write_text("# Backend service\nprint('Hello from backend')\n")
-    (mock_app / "frontend").mkdir()
+    (mock_app / "frontend").mkdir(parents=True)
     (mock_app / "frontend" / "App.js").write_text("// React app\nconsole.log('Hello from frontend');\n")
     (mock_app / "README.md").write_text("# Mock BullzAI App\n\nSimulated application repo.\n")
 
-    c.run("git add .")
-    c.run("git commit -m 'Initial commit: backend + frontend'")
+    # Initialize git in the directory
+    c.run(f"git -C {mock_app} init")
+    c.run(f"git -C {mock_app} config user.name 'Test User'")
+    c.run(f"git -C {mock_app} config user.email 'test@example.com'")
+    c.run(f"git -C {mock_app} add .")
+    c.run(f"git -C {mock_app} commit -m 'Initial commit: backend + frontend'")
 
     # Add more commits
     (mock_app / "backend" / "api.py").write_text("# API routes\n")
-    c.run("git add .")
-    c.run("git commit -m 'Add API routes'")
+    c.run(f"git -C {mock_app} add .")
+    c.run(f"git -C {mock_app} commit -m 'Add API routes'")
 
-    (mock_app / "common").mkdir()
+    (mock_app / "common").mkdir(parents=True)
     (mock_app / "common" / "utils.py").write_text("# Shared utilities\n")
-    c.run("git add .")
-    c.run("git commit -m 'Add common utilities'")
-
-    os.chdir("../..")
+    c.run(f"git -C {mock_app} add .")
+    c.run(f"git -C {mock_app} commit -m 'Add common utilities'")
 
     # Mock bullzai-data
     mock_data = Path("mock-repos/mock-data")
@@ -55,27 +53,25 @@ def setup_mock_repos(c):
         shutil.rmtree(mock_data)
 
     mock_data.mkdir(parents=True)
-    os.chdir(mock_data)
-    c.run("git init")
-    c.run("git config user.name 'Test User'")
-    c.run("git config user.email 'test@example.com'")
 
     # Create some files
-    (mock_data / "flows").mkdir()
+    (mock_data / "flows").mkdir(parents=True)
     (mock_data / "flows" / "bronze_flow.py").write_text("# Bronze layer flow\n")
-    (mock_data / "etl_utils").mkdir()
+    (mock_data / "etl_utils").mkdir(parents=True)
     (mock_data / "etl_utils" / "minio_client.py").write_text("# MinIO utilities\n")
     (mock_data / "README.md").write_text("# Mock BullzAI Data\n\nSimulated data pipeline repo.\n")
 
-    c.run("git add .")
-    c.run("git commit -m 'Initial commit: flows + etl_utils'")
+    # Initialize git in the directory
+    c.run(f"git -C {mock_data} init")
+    c.run(f"git -C {mock_data} config user.name 'Test User'")
+    c.run(f"git -C {mock_data} config user.email 'test@example.com'")
+    c.run(f"git -C {mock_data} add .")
+    c.run(f"git -C {mock_data} commit -m 'Initial commit: flows + etl_utils'")
 
     # Add more commits
     (mock_data / "flows" / "silver_flow.py").write_text("# Silver layer flow\n")
-    c.run("git add .")
-    c.run("git commit -m 'Add silver flow'")
-
-    os.chdir("../..")
+    c.run(f"git -C {mock_data} add .")
+    c.run(f"git -C {mock_data} commit -m 'Add silver flow'")
 
     print("✅ Mock repositories created!")
     print(f"   - {mock_app}")
@@ -187,21 +183,17 @@ def load_bundles(c, release="v1.0.0"):
             c.run(f'git clone "{bundle_path}" "{repo_path}"')
 
             # Set up mock GitLab remote
-            os.chdir(repo_path)
-            c.run("git remote add origin https://gitlab.tohad.local/bullzai/MOCK.git", warn=True)
-            os.chdir("../..")
+            c.run(f"git -C {repo_path} remote add origin https://gitlab.tohad.local/bullzai/MOCK.git", warn=True)
 
             print(f"   ✅ Cloned to {repo_path}")
 
         else:
             # Subsequent releases: fetch + merge
             print(f"   Updating from bundle (incremental)...")
-            os.chdir(repo_path)
 
-            c.run(f'git fetch "{bundle_path}" refs/heads/main:refs/remotes/byon/main')
-            c.run("git merge byon/main -m 'Merge from Byon bundle'")
-
-            os.chdir("../..")
+            # Fetch the main branch from the bundle, then merge
+            c.run(f'git -C {repo_path} fetch "{bundle_path}" refs/heads/main')
+            c.run(f'git -C {repo_path} merge FETCH_HEAD -m "Merge from Byon bundle"')
 
             print(f"   ✅ Updated {repo_path}")
 
@@ -237,10 +229,8 @@ USER 1000
 """)
 
     # Commit to Tohad's local repo
-    os.chdir(mock_app)
-    c.run("git add docker/overlays/tohad/")
-    c.run("git commit -m 'Add Tohad-specific Dockerfiles'")
-    os.chdir("../..")
+    c.run(f"git -C {mock_app} add docker/overlays/tohad/")
+    c.run(f"git -C {mock_app} commit -m 'Add Tohad-specific Dockerfiles'")
 
     print(f"✅ Tohad customizations added!")
     print(f"   File: {backend_dockerfile}")
@@ -262,16 +252,13 @@ def add_commits_to_repo(c, repo="app", message="Update"):
 
     print(f"\n📝 Adding commits to {repo_path.name}...")
 
-    os.chdir(repo_path)
-
     # Add a new file
-    new_file = Path(f"feature_{len(list(Path('.').glob('feature_*')))}.txt")
+    feature_count = len(list(repo_path.glob('feature_*')))
+    new_file = repo_path / f"feature_{feature_count}.txt"
     new_file.write_text(f"# {message}\n")
 
-    c.run("git add .")
-    c.run(f'git commit -m "{message}"')
-
-    os.chdir("../..")
+    c.run(f"git -C {repo_path} add .")
+    c.run(f'git -C {repo_path} commit -m "{message}"')
 
     print(f"✅ Commit added!")
 

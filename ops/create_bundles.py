@@ -58,9 +58,11 @@ def create_bundle(repo_path, output_path, previous_tag=None, current_tag=None):
         try:
             print(f"   Attempting incremental bundle: {previous_tag}..{current_tag}")
 
+            # Include the main branch ref along with the commit range
             result = run_cmd([
                 "git", "bundle", "create", str(output_path),
-                f"{previous_tag}..{current_tag}"
+                f"{previous_tag}..{current_tag}",
+                "main"
             ], cwd=repo_path)
 
             # Verify the bundle

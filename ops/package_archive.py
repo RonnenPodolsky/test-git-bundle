@@ -272,9 +272,9 @@ def package_archive(package_dir, output_dir, split=False, split_size_mb=2000, ba
     # Step 1: Compress
     archive_name = f"{package_dir.name}.7z"
     archive_path = output_dir / archive_name
-    compress_package(package_dir, archive_path)
+    actual_archive_path = compress_package(package_dir, archive_path)
 
-    files_to_ship = [archive_path]
+    files_to_ship = [Path(actual_archive_path)]
 
     # Step 2: Split (optional)
     if split:

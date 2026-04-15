@@ -30,7 +30,7 @@ def calculate_sha256(file_path):
 
 def compress_package(package_dir, output_path):
     """
-    Compress package directory to .7z file.
+    Compress package directory to .7z file (preferred) or .tar.gz (fallback).
 
     Args:
         package_dir: directory to compress
@@ -46,11 +46,16 @@ def compress_package(package_dir, output_path):
     print(f"   Source: {package_dir}")
     print(f"   Output: {output_path}")
 
-    # Check if 7z is available
+    # Check if 7z is available (PREFERRED)
     try:
-        subprocess.run(["7z", "--help"], capture_output=True, check=True)
+        subprocess.run(["7z", "--help"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+        print("   ✅ 7z found - using 7z compression (recommended)")
     except (subprocess.CalledProcessError, FileNotFoundError):
-        print("   ⚠️  7z not found, using tar.gz instead")
+        print("   ⚠️  7z not found!")
+        print("   ℹ️  Install 7-Zip for better compression:")
+        print("       macOS: brew install p7zip")
+        print("       Windows: https://www.7-zip.org/download.html")
+        print("   📦 Falling back to tar.gz...")
         return compress_with_tar(package_dir, output_path)
 
     # Compress with 7z
@@ -184,60 +189,172 @@ def create_checksums(files, output_path):
 
 
 def create_reconstruction_instructions(archive_name, num_chunks, output_path):
-    """Create instructions for reconstructing split/encoded archives."""
+    """Create Windows-compatible instructions for extracting the package."""
     output_path = Path(output_path)
 
-    instructions = f"""# Archive Reconstruction Instructions
+    # Determine if split or base64 encoded
+    is_split = num_chunks > 1
+    is_base64 = '.b64' in archive_name
 
-## Package: {archive_name}
+    instructions = f"""# Package Extraction Instructions
 
-### If Base64 Encoded (.b64 files)
+**Package:** {archive_name}
+**For:** Windows (Tohad deployment)
 
-1. Decode all .b64 files:
+---
+
+## Quick Start
+
+### Using 7-Zip GUI (Easiest)
+
+1. **Right-click** on `{archive_name}`
+2. Choose **7-Zip** → **Extract Here**
+3. Done! You can now access the package contents.
+
+---
+
+## Alternative: Command Line
+
+### Using Git Bash or PowerShell:
 
 ```bash
-{''.join([f'base64 -d {archive_name}.part{chr(97+i)}.b64 > {archive_name}.part{chr(97+i)}\\n' for i in range(num_chunks)])}
-```
-
-2. Combine parts:
-
-```bash
-cat {' '.join([f'{archive_name}.part{chr(97+i)}' for i in range(num_chunks)])} > {archive_name}
-```
-
-3. Extract archive:
-
-```bash
-# If .7z:
+# Extract the package
 7z x {archive_name}
 
-# If .tar.gz:
-tar xzf {archive_name}
+# Change to extracted directory
+cd {archive_name.replace('.7z', '')}
+
+# Verify contents
+ls
+# You should see:
+# - bundles/
+# - manifest.yaml
+# - RELEASE_NOTES.md
 ```
 
-### If NOT Encoded (direct split)
+---
 
-1. Combine parts:
+## Verify Package Integrity (Recommended)
 
-```bash
-cat {' '.join([f'{archive_name}.part{chr(97+i)}' for i in range(num_chunks)])} > {archive_name}
-```
-
-2. Extract archive:
-
-```bash
-7z x {archive_name}
-```
-
-### Verify Integrity
-
-Before extracting, verify checksums:
-
+**Using Git Bash:**
 ```bash
 sha256sum -c CHECKSUMS.sha256
 ```
 
-All checksums should show "OK".
+**Using PowerShell:**
+```powershell
+Get-Content CHECKSUMS.sha256 | ForEach-Object {{
+    $hash, $file = $_ -split '  '
+    $actual = (Get-FileHash $file -Algorithm SHA256).Hash.ToLower()
+    if ($actual -eq $hash) {{
+        Write-Host "OK: $file" -ForegroundColor Green
+    }} else {{
+        Write-Host "FAILED: $file" -ForegroundColor Red
+    }}
+}}
+```
+
+All files should show "OK".
+
+---
+
+## Package Contents
+
+After extraction, you'll find:
+
+- **bundles/** - Git bundle files for each repository
+- **manifest.yaml** - Package metadata and version information
+- **RELEASE_NOTES.md** - Changelog and deployment information
+
+---
+
+## Deploying Bundles to GitHub
+
+### First Release (Full Bundle)
+
+If this is your first deployment, clone from the bundle and push to your remote repository:
+
+```bash
+# Example: deploying mock-app bundle
+cd /c/Tohad/workspace
+
+# Clone from the bundle file
+git clone /c/Tohad/Releases/v1.0.0/bundles/mock-app.bundle mock-app-tohad
+
+# Navigate to the cloned repo
+cd mock-app-tohad
+
+# Add your remote repository
+git remote remove origin  # Remove bundle origin
+git remote add origin https://github.com/YourOrg/mock-app-tohad.git
+
+# Push everything to GitHub
+git push -u origin main
+git push origin --tags
+```
+
+### Incremental Updates (Diff Bundle)
+
+If this is an update, fetch changes from the bundle and merge:
+
+```bash
+# Example: updating existing mock-app-tohad repo
+cd /c/Tohad/workspace/mock-app-tohad
+
+# Verify you're on main branch
+git status
+
+# Fetch new commits from the bundle
+git fetch /c/Tohad/Releases/v2.0.0/bundles/mock-app.bundle refs/heads/main
+
+# Merge the updates
+git merge FETCH_HEAD -m "Merge v2.0.0 from bundle"
+
+# Push to GitHub
+git push origin main
+git push origin --tags
+```
+
+**Note:** Check `manifest.yaml` to see if bundles are `type: full` or `type: incremental`.
+
+---
+
+## Prerequisites
+
+- **7-Zip installed:** https://www.7-zip.org/download.html
+- **Git for Windows:** https://git-scm.com/download/win
+- **GitHub access:** Configured with SSH keys or personal access token
+
+---
+
+## Troubleshooting
+
+### "7z is not recognized"
+
+**Solution:** Install 7-Zip from https://www.7-zip.org/
+
+### "Cannot extract - file is corrupt"
+
+**Solution:**
+1. Verify checksums (see above)
+2. Re-download the package
+3. Try extracting with GUI instead of command line
+
+### Files extracted but can't find bundles/
+
+**Solution:**
+1. Check you're in the correct directory
+2. The structure should be:
+   ```
+   v1.0.0/
+   ├── bundles/
+   ├── manifest.yaml
+   └── RELEASE_NOTES.md
+   ```
+
+---
+
+**For detailed deployment instructions, refer to the separate deployment guide.**
 """
 
     with open(output_path, 'w') as f:

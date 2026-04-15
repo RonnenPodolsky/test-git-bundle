@@ -15,6 +15,19 @@ This repository demonstrates the **complete git bundle workflow** for shipping c
 3. **Bundle compression** - 7z compression with optional split/base64
 4. **Tohad workspace simulation** - Clone and merge from bundles
 5. **Tohad-specific file preservation** - Verify local files aren't overwritten
+6. **Real GitHub integration** - Test with actual GitHub repositories
+
+## 🌐 GitHub Repositories
+
+This workflow uses 4 GitHub repositories:
+
+**Byon (Development) - Source Repos:**
+- https://github.com/RonnenPodolsky/mock-app
+- https://github.com/RonnenPodolsky/mock-data
+
+**Tohad (Deployment) - Target Repos:**
+- https://github.com/RonnenPodolsky/mock-app-tohad
+- https://github.com/RonnenPodolsky/mock-data-tohad
 
 ---
 
@@ -23,57 +36,52 @@ This repository demonstrates the **complete git bundle workflow** for shipping c
 ```
 test-git-bundle/
 ├── ops/
-│   ├── create_bundles.py      # Git bundle creation (Step 6 of M3)
-│   └── package_archive.py     # Compression + split + base64 (Step 11 of M3)
-├── tasks.py                   # Invoke tasks (CLI commands)
-├── requirements.txt           # Python dependencies
-├── QUICKSTART.md             # Step-by-step usage guide
-└── README.md                 # This file
+│   ├── create_bundles.py          # Git bundle creation (Step 6 of M3)
+│   └── package_archive.py         # Compression + split + base64 (Step 11 of M3)
+├── tasks.py                       # Invoke tasks (CLI commands)
+├── requirements.txt               # Python dependencies
+├── QUICKSTART.md                  # Step-by-step usage guide
+├── GITHUB_SETUP.md                # GitHub integration guide (Byon side)
+├── TOHAD_UNPACK_INSTRUCTIONS.md   # Tohad deployment guide (Tohad side)
+└── README.md                      # This file
 
 Generated during tests:
-├── mock-repos/               # Simulated bullzai-app and bullzai-data
+├── mock-repos/               # Simulated bullzai-app and bullzai-data (pushed to GitHub)
 ├── releases/                 # Created release packages
 │   ├── v1.0.0/              # First release (full bundles)
 │   ├── v2.0.0/              # Second release (incremental bundles)
-│   └── final/               # Compressed packages
-└── tohad-workspace/         # Simulated Tohad repos
+│   └── final/               # Compressed packages for transfer
+└── tohad-workspace/         # Simulated Tohad repos (local, pushed to -tohad GitHub repos)
 ```
 
 ---
 
 ## 🚀 Quick Start
 
-### 1. Activate Virtual Environment
+### For Complete Workflow Guide
 
-**macOS/Linux:**
+📚 **See [COMPLETE_GUIDE.md](COMPLETE_GUIDE.md)** - Comprehensive end-to-end guide covering:
+- Byon side (macOS): Setup → Create release → Transfer
+- Tohad side (Windows): Verify → Extract → Deploy
+- Incremental updates for both sides
+- Troubleshooting and verification
+
+### Option A: Local Testing (Fast)
+
+**For quick local testing without GitHub:**
+
 ```bash
-cd /Users/ronnennpodolsky/Downloads/Dev/Byon/Platform/test-git-bundle
 source .venv/bin/activate
-```
-
-**Windows:**
-```bash
-cd C:\path\to\test-git-bundle
-.venv\Scripts\activate
-```
-
-### 2. Run Complete Workflow Test
-
-```bash
 invoke test-full-workflow
 ```
 
-This runs all 8 steps:
-1. Setup mock repos
-2. Create v1.0.0 (full bundles)
-3. Load at Tohad
-4. Add Tohad customizations
-5. Add new commits
-6. Create v2.0.0 (incremental bundles)
-7. Load v2.0.0 at Tohad
-8. Verify Tohad files preserved ✅
+This runs all 8 steps locally to verify the bundle mechanism works.
 
-**Expected output:** See bundle sizes, manifest contents, and confirmation that Tohad-specific files are preserved.
+### Option B: GitHub Integration (Real-World)
+
+**For complete real-world testing with GitHub repositories:**
+
+Follow **COMPLETE_GUIDE.md** for step-by-step instructions.
 
 ### 3. Inspect Results
 
@@ -83,8 +91,11 @@ ls -lh releases/v1.0.0/bundles/  # Full bundles (~50 KB)
 ls -lh releases/v2.0.0/bundles/  # Incremental (~5 KB - 90% smaller!)
 
 # Check manifests
-cat releases/v1.0.0/manifest.json  # type: "full"
-cat releases/v2.0.0/manifest.json  # type: "incremental"
+cat releases/v1.0.0/manifest.yaml  # type: "full"
+cat releases/v2.0.0/manifest.yaml  # type: "incremental"
+
+# Check release notes
+cat releases/v2.0.0/RELEASE_NOTES.md  # Changelog and deployment info
 
 # Verify Tohad workspace
 cd tohad-workspace/mock-app
@@ -200,40 +211,38 @@ base64 package.7z > package.7z.b64
 
 ### Manifest Comparison
 
-**v1.0.0/manifest.json:**
-```json
-{
-  "version": "v1.0.0",
-  "git_refs": {
-    "mock-app": "v1.0.0",
-    "mock-data": "v1.0.0"
-  },
-  "bundles": {
-    "mock-app": {
-      "type": "full",
-      "size": 51234,
-      "from_tag": null
-    }
-  }
-}
+**v1.0.0/manifest.yaml:**
+```yaml
+version: v1.0.0
+git_refs:
+  mock-app: v1.0.0
+  mock-data: v1.0.0
+bundles:
+  mock-app:
+    type: full
+    size: 51234
+    from_tag: null
+  mock-data:
+    type: full
+    size: 48567
+    from_tag: null
 ```
 
-**v2.0.0/manifest.json:**
-```json
-{
-  "version": "v2.0.0",
-  "git_refs": {
-    "mock-app": "v2.0.0",
-    "mock-data": "v2.0.0"
-  },
-  "bundles": {
-    "mock-app": {
-      "type": "incremental",
-      "size": 5123,
-      "from_tag": "v1.0.0"
-    }
-  }
-}
+**v2.0.0/manifest.yaml:**
+```yaml
+version: v2.0.0
+git_refs:
+  mock-app: v2.0.0
+  mock-data: v2.0.0
+bundles:
+  mock-app:
+    type: incremental
+    size: 5123
+    from_tag: v1.0.0
+  mock-data:
+    type: incremental
+    size: 4897
+    from_tag: v1.0.0
 ```
 
 ---

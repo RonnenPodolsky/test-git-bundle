@@ -8,6 +8,7 @@ Creates incremental or full git bundles for repository distribution.
 import os
 import subprocess
 import json
+import yaml
 from pathlib import Path
 
 
@@ -30,7 +31,11 @@ def get_previous_tag(manifest_path, repo_name):
         return None
 
     with open(manifest_path) as f:
-        manifest = json.load(f)
+        # Support both JSON and YAML manifests
+        if manifest_path.endswith('.json'):
+            manifest = json.load(f)
+        else:
+            manifest = yaml.safe_load(f)
 
     git_refs = manifest.get("git_refs", {})
     previous_tag = git_refs.get(repo_name)
